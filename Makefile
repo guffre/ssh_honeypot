@@ -1,22 +1,30 @@
 # Modified Makefile to allow for building of the standalone module
 
-TITLE=libnss_identity
+nss_name = libnss_identity
+pam_name = pam_logpassword
 
-CC = gcc
-LIBSRC = $(TITLE).c
-LIBOBJ = $(TITLE).o
-LIBSHARED = $(TITLE).so.2
+nss_src = $(nss_name).c
+nss_obj = $(nss_name).o
+nss_lib = $(nss_name).so.2
 
-all: $(LIBSHARED)
+pam_src = $(pam_name).c
+pam_obj = $(pam_name).o
+pam_lib = $(pam_name).so
 
-$(LIBSHARED): $(LIBOBJ)
-		ld -x --shared -o $@ $(LIBOBJ)
+all: $(nss_name).so.2 $(pam_name).so
+
+$(nss_obj):
+	gcc -fPIC -c $(nss_src) -o $(nss_obj)
+
+$(nss_lib): $(nss_obj)
+	ld -x --shared -o $@ $(nss_obj)
+
+$(pam_obj):
+	gcc -c $(pam_src) -o $(pam_obj)
+
+$(pam_lib): $(pam_obj)
+	ld --shared -o $@ $(pam_obj)
 
 clean:
-	rm -f $(LIBOBJ) $(LIBSHARED) core *~
-
-extraclean: clean
-	rm -f *.a *.o *.so *.bak 
-
-.c.o:
-	$(CC) -fPIC -c $< -o $@
+	rm -f $(nss_obj) $(nss_lib) core *~
+	rm -f $(pam_obj) $(pam_lib) core *~

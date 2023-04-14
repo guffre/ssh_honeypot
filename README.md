@@ -10,14 +10,52 @@ The end result is producing two modules: a PAM module and an NSS module.
 
 Used in conjuction, the PAM module will store the username and plaintext password into a sqlite3 database. The NSS module will prevent the sshd service from obfuscating passwords for users that don't exist on the system.
 
+# Installation
+
+To build and install the NSS and PAM libraries, default locations for 64-bit Ubuntu:
+
+```
+make
+cp libnss_identity.so.2 /usr/lib/x86_64-linux-gnu/
+cp pam_logpassword.so /usr/lib/x86_64-linux-gnu/security/
+```
+
+After building and installing the modules, you need to tell the OS to use them:
+
+Editing the `/etc/pam.d/common-auth file`:
+
+```
+# here are the per-package modules (the "Primary" block)
+auth    [success=2 default=ignore]      pam_unix.so nullok
+auth    optional                        pam_logpassword.so
+# here's the fallback if no module succeeds
+auth    requisite                       pam_deny.so
+```
+
+Editing the `/etc/nsswitch.conf` file:
+
+```
+passwd:         files systemd identity
+group:          files systemd identity
+shadow:         files identity
+```
+
+# Dependencies
+
+The PAM module has the following dependencies:
+
+* libpam0g-dev
+
+* libsqlite3-dev
+
 # Components
 
-| Component | Function |
-| --- | --- |
-| PAM Module | Saves the actual username and password into a database |
-| /etc/pam.d/common-auth | Tells the OS to use the PAM module |
-| NSS Module | sshd makes a call to `getpwnam` to check if the username is valid. If sshd detects an invalid username, a function called `fake_password` changes the password bytes to \x08\x0a\x0d\x7fINCORRECT |
-| /etc/nsswitch.conf | Tells the OS to use the NSS module |
+| Component              | Function                                                                                                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PAM Module             | Saves the actual username and password into a database                                                                                                                                            |
+| /etc/pam.d/common-auth | Tells the OS to use the PAM module                                                                                                                                                                |
+| NSS Module             | sshd makes a call to `getpwnam` to check if the username is valid. If sshd detects an invalid username, a function called `fake_password` changes the password bytes to \x08\x0a\x0d\x7fINCORRECT |
+| /etc/nsswitch.conf     | Tells the OS to use the NSS module                                                                                                                                                                |
 
 # PAM Module
 
@@ -41,19 +79,6 @@ Telling sshd to use PAM results in a configuration file found at `/etc/pam.d/ssh
 We will write our own implementation of `pam_sm_authenticate` in order to capture the plaintext password, and then store the username and password into a sqlite3 database. To compile you will need the `libpam0g-dev` and `libsqlite3-dev` packages.
 
 On Ubuntu these can be installed with:
-
-```
-apt-get install libpam0g-dev
-apt-get install libsqlite3-dev
-```
-
-After compiling, the PAM module should be placed into the `/usr/lib/x86_64-linux-gnu/security/` directory:
-
-```
-make
-chmod 644 pam_logpassword.so
-cp pam_logpassword.so /usr/lib/x86_64-linux-gnu/security/pam_logpassword.so
-```
 
 # /etc/pam.d/common-auth
 
