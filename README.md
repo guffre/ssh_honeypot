@@ -15,7 +15,7 @@ Used in conjuction, the PAM module will store the username and plaintext passwor
 | Component | Function |
 | --- | --- |
 | PAM Module | Saves the actual username and password into a database |
-| /etc/pam.d/sshd | Tells the OS to use the PAM module |
+| /etc/pam.d/common-auth | Tells the OS to use the PAM module |
 | NSS Module | sshd makes a call to `getpwnam` to check if the username is valid. If sshd detects an invalid username, a function called `fake_password` changes the password bytes to \x08\x0a\x0d\x7fINCORRECT |
 | /etc/nsswitch.conf | Tells the OS to use the NSS module |
 
@@ -55,13 +55,27 @@ chmod 644 pam_logpassword.so
 cp pam_logpassword.so /usr/lib/x86_64-linux-gnu/security/pam_logpassword.so
 ```
 
-# /etc/pam.d/sshd
+# /etc/pam.d/common-auth
 
-At the top of `/etc/pam.d/sshd` the following line should be added. This line tells PAM to use our module and "authenticate" against it.
+Inside the `/etc/pam.d/common-auth` file the following lines should be modified/added. These lines tells PAM to use our module and "authenticate" against it, but only when someone fails to authenticate successfully.
+
+IMPORTANT: It is likely that your file has `[success=1 default=ignore]`. If you add the `pam_logpassword.so` line, you MUST change that number to a 2. Otherwise, ALL logins will be denied.
 
 ```
-auth      optional  pam_logpassword.so
+# here are the per-package modules (the "Primary" block)
+auth    [success=2 default=ignore]      pam_unix.so nullok
+auth    optional                        pam_logpassword.so
+# here's the fallback if no module succeeds
+auth    requisite                       pam_deny.so
 ```
+
+The auth keyword specifies that an entry is used for user authentication.
+
+The [success=2 default=ignore] control statement specifies the behavior of the authentication process if this module succeeds. It tells PAM to skip the next two modules in the stack if this one succeeds, and to ignore this entry entirely if it fails.
+
+In the case of an incorrect password/failed login, the `pam_logpassword.so` and `pam_deny.so` modules will be called, which logs the password and denies the login.
+
+In the case of a correct login, the `pam_logpassword.so` and `pam_deny.so` lines are skipped.
 
 # NSS Module
 
